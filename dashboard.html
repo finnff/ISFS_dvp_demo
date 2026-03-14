@@ -1,0 +1,934 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DvP Protocol - Live Settlement Dashboard</title>
+    <script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #e4e4e4;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container { max-width: 1400px; margin: 0 auto; }
+
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 12px;
+        }
+
+        h1 { font-size: 2.5rem; color: #00d4ff; margin-bottom: 10px; }
+        .subtitle { color: #888; font-size: 1.1rem; }
+
+        /* --- Controls --- */
+        .controls-section {
+            background: rgba(255,255,255,0.05);
+            padding: 20px 30px;
+            border-radius: 12px;
+            margin-bottom: 30px;
+            border: 1px solid rgba(255,255,255,0.1);
+            display: flex;
+            gap: 30px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            min-width: 200px;
+            flex: 1;
+        }
+
+        .control-group label {
+            font-size: 0.8rem;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .control-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .control-row input[type="range"] {
+            flex: 1;
+            accent-color: #ff6b6b;
+            height: 6px;
+        }
+
+        .control-val {
+            font-weight: bold;
+            color: #ff6b6b;
+            min-width: 55px;
+            text-align: right;
+            font-size: 0.95rem;
+        }
+
+        .btn {
+            padding: 12px 28px;
+            border: none;
+            border-radius: 8px;
+            font-weight: bold;
+            font-size: 0.9rem;
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            transition: transform 0.1s, opacity 0.2s;
+            white-space: nowrap;
+        }
+
+        .btn:hover { opacity: 0.85; }
+        .btn:active { transform: scale(0.97); }
+
+        .btn-reset {
+            background: linear-gradient(135deg, #ff6b6b, #ee5a24);
+            color: #fff;
+        }
+
+        .btn-pause {
+            background: linear-gradient(135deg, #f0b90b, #e6a800);
+            color: #1a1a2e;
+        }
+
+        .btn-pause.paused {
+            background: linear-gradient(135deg, #00d4ff, #0099cc);
+            color: #fff;
+        }
+
+        /* --- Stats Grid --- */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: rgba(255,255,255,0.05);
+            padding: 20px 12px;
+            border-radius: 12px;
+            text-align: center;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .stat-card.dvp-card { border-top: 3px solid #00d4ff; }
+        .stat-card.trad-card { border-top: 3px solid #ff6b6b; }
+
+        .stat-value { font-size: 2rem; font-weight: bold; margin-bottom: 8px; }
+        .stat-card.dvp-card .stat-value { color: #00d4ff; }
+        .stat-card.trad-card .stat-value { color: #ff6b6b; }
+
+        .stat-label {
+            color: #888;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .stat-type-tag {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 0.65rem;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 6px;
+        }
+
+        .stat-card.dvp-card .stat-type-tag {
+            background: rgba(0, 212, 255, 0.15);
+            color: #00d4ff;
+        }
+
+        .stat-card.trad-card .stat-type-tag {
+            background: rgba(255, 107, 107, 0.15);
+            color: #ff6b6b;
+        }
+
+        /* --- Price Chart --- */
+        .chart-section {
+            background: rgba(255,255,255,0.05);
+            padding: 25px;
+            border-radius: 12px;
+            margin-bottom: 30px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .chart-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            margin-bottom: 15px;
+        }
+
+        .chart-title { font-size: 1.3rem; color: #fff; }
+
+        .chart-subtitle {
+            color: #888;
+            font-size: 0.85rem;
+            max-width: 600px;
+            text-align: right;
+        }
+
+        #priceChart {
+            width: 100%;
+            height: 340px;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .chart-legend {
+            display: flex;
+            gap: 24px;
+            margin-top: 12px;
+            flex-wrap: wrap;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.85rem;
+            color: #aaa;
+        }
+
+        .legend-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+
+        .legend-dot.gold { background: #f0b90b; }
+        .legend-dot.cyan { background: #00d4ff; }
+        .legend-dot.red  { background: #ff6b6b; }
+        .legend-dot.red-sq { background: #ff6b6b; border-radius: 2px; }
+        .legend-bar { width: 14px; height: 10px; display: inline-block; border-radius: 2px; }
+        .legend-bar.cyan-bar { background: rgba(0, 212, 255, 0.7); }
+        .legend-bar.red-bar { background: rgba(255, 107, 107, 0.7); }
+
+        /* --- Comparison Section --- */
+        .comparison-section {
+            background: rgba(255,255,255,0.05);
+            padding: 30px;
+            border-radius: 12px;
+            margin-bottom: 30px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .comparison-title { font-size: 1.3rem; margin-bottom: 20px; color: #fff; }
+
+        .comparison-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .comparison-card {
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .comparison-card.onchain {
+            background: rgba(0, 212, 255, 0.1);
+            border: 2px solid #00d4ff;
+        }
+
+        .comparison-card.traditional {
+            background: rgba(255, 107, 107, 0.1);
+            border: 2px solid #ff6b6b;
+        }
+
+        .comparison-value { font-size: 3rem; font-weight: bold; margin-bottom: 10px; }
+        .comparison-card.onchain .comparison-value { color: #00d4ff; }
+        .comparison-card.traditional .comparison-value { color: #ff6b6b; }
+
+        .comparison-label { font-size: 1.1rem; margin-bottom: 5px; }
+        .comparison-desc { color: #888; font-size: 0.9rem; }
+
+        /* --- Settlements Feed --- */
+        .settlements-section {
+            background: rgba(255,255,255,0.05);
+            padding: 30px;
+            border-radius: 12px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .settlements-title { font-size: 1.3rem; margin-bottom: 20px; color: #fff; }
+
+        .settlements-list {
+            max-height: 500px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .settlement-item {
+            background: rgba(255,255,255,0.03);
+            padding: 15px 20px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            display: grid;
+            grid-template-columns: 80px auto 1fr 130px 110px;
+            gap: 15px;
+            align-items: center;
+            border-left: 3px solid #00d4ff;
+            transition: background 0.3s;
+        }
+
+        .settlement-item.type-traditional { border-left-color: #ff6b6b; }
+        .settlement-item.status-failed {
+            border-left-color: #ff6b6b;
+            background: rgba(255, 107, 107, 0.05);
+        }
+        .settlement-item.status-pending { border-left-color: #f0b90b; }
+
+        .settlement-id { font-weight: bold; color: #888; }
+
+        .type-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 0.7rem;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            white-space: nowrap;
+        }
+
+        .type-badge.dvp { background: rgba(0, 212, 255, 0.2); color: #00d4ff; }
+        .type-badge.traditional { background: rgba(255, 107, 107, 0.2); color: #ff6b6b; }
+        .type-badge.pending {
+            background: rgba(240, 185, 11, 0.2);
+            color: #f0b90b;
+            animation: pulse-badge 1.5s infinite;
+        }
+
+        @keyframes pulse-badge {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+
+        .settlement-details { display: flex; gap: 20px; flex-wrap: wrap; }
+        .settlement-detail { font-size: 0.9rem; }
+        .settlement-detail span { color: #00d4ff; }
+        .settlement-latency { text-align: right; font-weight: bold; }
+        .settlement-status { text-align: center; }
+
+        .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+
+        .status-badge.settled { background: rgba(0, 255, 0, 0.2); color: #00ff00; }
+        .status-badge.failed  { background: rgba(255, 107, 107, 0.2); color: #ff6b6b; }
+        .status-badge.pending {
+            background: rgba(240, 185, 11, 0.2);
+            color: #f0b90b;
+            animation: pulse-badge 1.5s infinite;
+        }
+
+        .fail-reason {
+            color: #ff6b6b;
+            font-size: 0.85rem;
+            padding: 8px 12px;
+            background: rgba(255, 107, 107, 0.08);
+            border-radius: 6px;
+            margin-bottom: 10px;
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            20% { transform: translateX(-4px); }
+            40% { transform: translateX(4px); }
+            60% { transform: translateX(-3px); }
+            80% { transform: translateX(3px); }
+        }
+
+        .settlement-item.just-failed { animation: shake 0.5s; }
+
+        .live-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            background: #00ff00;
+            border-radius: 50%;
+            margin-right: 8px;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+
+        @media (max-width: 900px) {
+            .stats-grid { grid-template-columns: repeat(3, 1fr); }
+            .settlement-item { grid-template-columns: 60px auto 1fr 100px; }
+            .settlement-status { display: none; }
+        }
+
+        @media (max-width: 600px) {
+            .stats-grid { grid-template-columns: repeat(2, 1fr); }
+            .comparison-grid { grid-template-columns: 1fr; }
+            .controls-section { flex-direction: column; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1><span class="live-indicator"></span>DvP Protocol Dashboard</h1>
+            <p class="subtitle">Real-time Instant Settlement Monitor &mdash; Blockchain DvP vs Traditional Clearing</p>
+        </header>
+
+        <!-- Controls -->
+        <div class="controls-section">
+            <div class="control-group">
+                <label>Traditional Settlement Latency</label>
+                <div class="control-row">
+                    <input type="range" id="sliderLatency" min="1" max="10" step="0.5" value="5">
+                    <span class="control-val" id="valLatency">5.0s</span>
+                </div>
+            </div>
+            <div class="control-group">
+                <label>Traditional Success Rate</label>
+                <div class="control-row">
+                    <input type="range" id="sliderSuccess" min="50" max="100" step="1" value="95">
+                    <span class="control-val" id="valSuccess">95%</span>
+                </div>
+            </div>
+            <button class="btn btn-pause" id="btnPause">Pause</button>
+            <button class="btn btn-reset" id="btnReset">Reset</button>
+        </div>
+
+        <!-- Stats Grid -->
+        <div class="stats-grid">
+            <div class="stat-card dvp-card">
+                <div class="stat-type-tag">Blockchain DvP</div>
+                <div class="stat-value" id="dvpCount">0</div>
+                <div class="stat-label">Settlements</div>
+            </div>
+            <div class="stat-card dvp-card">
+                <div class="stat-type-tag">Blockchain DvP</div>
+                <div class="stat-value" id="dvpLatency">0ms</div>
+                <div class="stat-label">Avg Latency</div>
+            </div>
+            <div class="stat-card dvp-card">
+                <div class="stat-type-tag">Blockchain DvP</div>
+                <div class="stat-value" id="dvpSuccess">100%</div>
+                <div class="stat-label">Success Rate</div>
+            </div>
+            <div class="stat-card trad-card">
+                <div class="stat-type-tag">Traditional</div>
+                <div class="stat-value" id="tradCount">0</div>
+                <div class="stat-label">Settlements</div>
+            </div>
+            <div class="stat-card trad-card">
+                <div class="stat-type-tag">Traditional</div>
+                <div class="stat-value" id="tradLatency">0ms</div>
+                <div class="stat-label">Avg Latency</div>
+            </div>
+            <div class="stat-card trad-card">
+                <div class="stat-type-tag">Traditional</div>
+                <div class="stat-value" id="tradSuccess">100%</div>
+                <div class="stat-label">Success Rate</div>
+            </div>
+        </div>
+
+        <!-- Price Chart -->
+        <div class="chart-section">
+            <div class="chart-header">
+                <h2 class="chart-title">ACME Share Price &amp; Settlement Events</h2>
+                <p class="chart-subtitle">Watch how the blockchain version (cyan) completes instantly while the traditional process (red) takes noticeably longer</p>
+            </div>
+            <div id="priceChart"></div>
+            <div class="chart-legend">
+                <div class="legend-item"><span class="legend-dot gold"></span> Trade executed</div>
+                <div class="legend-item"><span class="legend-dot cyan"></span> DvP settled (instant)</div>
+                <div class="legend-item"><span class="legend-dot red"></span> Traditional settled (delayed)</div>
+                <div class="legend-item"><span class="legend-dot red-sq"></span> Traditional failed</div>
+                <div class="legend-item"><span class="legend-bar cyan-bar"></span> DvP latency (bottom)</div>
+                <div class="legend-item"><span class="legend-bar red-bar"></span> Traditional latency (bottom)</div>
+            </div>
+        </div>
+
+        <!-- Comparison -->
+        <div class="comparison-section">
+            <h2 class="comparison-title">Settlement Speed Comparison</h2>
+            <div class="comparison-grid">
+                <div class="comparison-card onchain">
+                    <div class="comparison-value" id="onchainTime">&lt;1s</div>
+                    <div class="comparison-label">Blockchain DvP</div>
+                    <div class="comparison-desc">Instant settlement &mdash; both sides complete together</div>
+                </div>
+                <div class="comparison-card traditional">
+                    <div class="comparison-value" id="tradTime">T+1</div>
+                    <div class="comparison-label">Traditional Markets</div>
+                    <div class="comparison-desc">24+ hours with 5-7 intermediaries</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Settlement Feed -->
+        <div class="settlements-section">
+            <h2 class="settlements-title">Live Settlement Feed</h2>
+            <div class="settlements-list" id="settlementsList"></div>
+        </div>
+    </div>
+
+    <script>
+    // =================================================================
+    // CONFIG & STATE
+    // =================================================================
+    const FAIL_REASONS = [
+        "Counterparty bank rejected transfer",
+        "Clearing house reconciliation mismatch",
+        "Custodian authentication timeout",
+        "Insufficient margin at intermediary",
+        "Regulatory hold placed on transfer",
+        "Settlement agent system outage",
+    ];
+
+    let simRunning = true;
+    let nextOrderId = 0;
+    let currentPrice = 150;
+    let settlements = [];          // all records
+    let pendingTraditional = [];   // references to pending trad records
+    let renderedFailIds = new Set();
+
+    // Slider-driven params (read live)
+    function getTradLatency() { return parseFloat(document.getElementById('sliderLatency').value); }
+    function getTradSuccessRate() { return parseInt(document.getElementById('sliderSuccess').value) / 100; }
+
+    // =================================================================
+    // PRICE CHART (lightweight-charts) — monotonic time fix
+    // =================================================================
+    const chartContainer = document.getElementById('priceChart');
+    let chart, priceSeries, dvpBarSeries, tradBarSeries;
+    let priceData = [];
+    let dvpBarData = [];
+    let tradBarData = [];
+    let allMarkers = [];
+    let lastChartTime = 0;
+
+    function initChart() {
+        if (chart) chart.remove();
+        chart = LightweightCharts.createChart(chartContainer, {
+            width: chartContainer.clientWidth,
+            height: 340,
+            layout: {
+                background: { type: 'solid', color: 'transparent' },
+                textColor: '#888',
+            },
+            grid: {
+                vertLines: { color: 'rgba(255,255,255,0.04)' },
+                horzLines: { color: 'rgba(255,255,255,0.04)' },
+            },
+            crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
+            rightPriceScale: { borderColor: 'rgba(255,255,255,0.1)' },
+            timeScale: {
+                borderColor: 'rgba(255,255,255,0.1)',
+                timeVisible: true,
+                secondsVisible: true,
+            },
+        });
+        priceSeries = chart.addLineSeries({
+            color: '#00d4ff',
+            lineWidth: 2,
+            priceLineVisible: false,
+            lastValueVisible: true,
+        });
+
+        // Latency histogram bars at the bottom (separate price scale)
+        dvpBarSeries = chart.addHistogramSeries({
+            priceFormat: { type: 'volume' },
+            priceScaleId: 'latency',
+            color: '#00d4ff',
+            base: 0,
+            lastValueVisible: false,
+            priceLineVisible: false,
+        });
+
+        tradBarSeries = chart.addHistogramSeries({
+            priceFormat: { type: 'volume' },
+            priceScaleId: 'latency',
+            color: '#ff6b6b',
+            base: 0,
+            lastValueVisible: false,
+            priceLineVisible: false,
+        });
+
+        // Put latency scale on the left, small, at the bottom
+        chart.priceScale('latency').applyOptions({
+            scaleMargins: { top: 0.85, bottom: 0 },
+            drawTicks: false,
+            borderVisible: false,
+        });
+    }
+    initChart();
+
+    window.addEventListener('resize', () => {
+        chart.applyOptions({ width: chartContainer.clientWidth });
+    });
+
+    /** Return a strictly-increasing UTC timestamp for the chart. */
+    function getChartTime() {
+        const t = Math.floor(Date.now() / 1000);
+        lastChartTime = Math.max(t, lastChartTime + 1);
+        return lastChartTime;
+    }
+
+    function priceTick() {
+        if (!simRunning) return;
+        const drift = 0.0001;
+        const vol = 0.002;
+        const shock = (Math.random() + Math.random() + Math.random() +
+                       Math.random() + Math.random() + Math.random() - 3) / 3;
+        currentPrice *= (1 + drift + vol * shock);
+        currentPrice = Math.round(currentPrice * 100) / 100;
+
+        const t = getChartTime();
+        priceData.push({ time: t, value: currentPrice });
+        if (priceData.length > 600) priceData.shift();
+        priceSeries.setData(priceData);
+    }
+
+    function addMarker(type, orderId) {
+        const t = getChartTime();
+        let m;
+        if (type === 'executed') {
+            m = { time: t, position: 'belowBar', color: '#f0b90b', shape: 'arrowUp', text: '#' + orderId };
+        } else if (type === 'dvp') {
+            m = { time: t, position: 'aboveBar', color: '#00d4ff', shape: 'circle', text: '#' + orderId };
+        } else if (type === 'trad-settled') {
+            m = { time: t, position: 'aboveBar', color: '#ff6b6b', shape: 'circle', text: '#' + orderId };
+        } else if (type === 'trad-failed') {
+            m = { time: t, position: 'aboveBar', color: '#ff6b6b', shape: 'square', text: '#' + orderId + ' FAIL' };
+        }
+        if (m) {
+            allMarkers.push(m);
+            // Keep markers bounded
+            if (allMarkers.length > 200) allMarkers.splice(0, allMarkers.length - 200);
+            allMarkers.sort((a, b) => a.time - b.time);
+            priceSeries.setMarkers(allMarkers);
+        }
+    }
+
+    // Price tick every 500ms
+    let priceInterval = setInterval(priceTick, 500);
+    priceTick();
+
+    // =================================================================
+    // SIMULATION ENGINE (client-side, runs forever)
+    // =================================================================
+    function generateTrade() {
+        if (!simRunning) return;
+
+        const orderId = nextOrderId++;
+        const cashAmount = Math.floor(Math.random() * 99000) + 1000;
+        const securitiesAmount = Math.floor(Math.random() * 990) + 10;
+        const securityType = ["Stock", "Bond", "ETF", "Commodity"][Math.floor(Math.random() * 4)];
+        const price = currentPrice;
+        const now = Date.now() / 1000;
+
+        // --- DvP settlement: instant (~300-600ms simulated) ---
+        const dvpLatencyMs = 30 + Math.random() * 80;
+        const dvpRecord = {
+            orderId,
+            status: "settled",
+            type: "dvp",
+            assetSymbol: "ACME",
+            assetPrice: price,
+            cashAmount,
+            securitiesAmount,
+            securityType,
+            submissionTime: now,
+            settlementTime: now + dvpLatencyMs / 1000,
+            latencyMs: dvpLatencyMs,
+            atomic: true,
+        };
+        settlements.push(dvpRecord);
+
+        // Chart markers: executed + DvP settled (appear at ~same time)
+        addMarker('executed', orderId);
+        setTimeout(() => {
+            addMarker('dvp', orderId);
+            // Add DvP latency bar (tiny — shows how fast it is)
+            const t = getChartTime();
+            dvpBarData.push({ time: t, value: dvpLatencyMs / 1000, color: 'rgba(0, 212, 255, 0.7)' });
+            if (dvpBarData.length > 100) dvpBarData.shift();
+            dvpBarSeries.setData(dvpBarData);
+        }, 150);
+
+        // --- Traditional settlement: delayed, may fail ---
+        const tradRecord = {
+            orderId,
+            status: "pending",
+            type: "traditional",
+            assetSymbol: "ACME",
+            assetPrice: price,
+            cashAmount,
+            securitiesAmount,
+            securityType,
+            submissionTime: now,
+            settlementTime: null,
+            latencyMs: null,
+            atomic: false,
+        };
+        settlements.push(tradRecord);
+        pendingTraditional.push(tradRecord);
+
+        // Resolve after slider-driven delay
+        const latBase = getTradLatency();
+        const delaySec = latBase * (0.75 + Math.random() * 0.5); // +/- 25%
+        setTimeout(() => resolveTraditional(tradRecord), delaySec * 1000);
+
+        refreshUI();
+    }
+
+    function resolveTraditional(rec) {
+        if (rec.status !== 'pending') return; // already resolved (e.g. after reset)
+        const now = Date.now() / 1000;
+        const successRate = getTradSuccessRate();
+
+        if (Math.random() < successRate) {
+            rec.status = "settled";
+            rec.settlementTime = now;
+            rec.latencyMs = (now - rec.submissionTime) * 1000;
+            addMarker('trad-settled', rec.orderId);
+            // Add traditional latency bar (tall — shows the delay)
+            const t = getChartTime();
+            tradBarData.push({ time: t, value: rec.latencyMs / 1000, color: 'rgba(255, 107, 107, 0.7)' });
+            if (tradBarData.length > 100) tradBarData.shift();
+            tradBarSeries.setData(tradBarData);
+        } else {
+            rec.status = "failed";
+            rec.traditionalFailReason = FAIL_REASONS[Math.floor(Math.random() * FAIL_REASONS.length)];
+            addMarker('trad-failed', rec.orderId);
+            // Failed trade also gets a red bar showing max delay
+            const t = getChartTime();
+            const failLatency = (now - rec.submissionTime);
+            tradBarData.push({ time: t, value: failLatency, color: 'rgba(255, 50, 50, 0.9)' });
+            if (tradBarData.length > 100) tradBarData.shift();
+            tradBarSeries.setData(tradBarData);
+        }
+
+        // Remove from pending list
+        const idx = pendingTraditional.indexOf(rec);
+        if (idx !== -1) pendingTraditional.splice(idx, 1);
+
+        refreshUI();
+    }
+
+    // Generate a new trade every ~1.5s
+    let tradeInterval = setInterval(generateTrade, 7500);
+    // Fire the first one quickly
+    setTimeout(generateTrade, 1000);
+
+    // =================================================================
+    // UI REFRESH
+    // =================================================================
+    function refreshUI() {
+        updateStats();
+        updateComparison();
+        renderSettlements();
+    }
+
+    function updateStats() {
+        const dvp = settlements.filter(s => s.type === 'dvp');
+        const trad = settlements.filter(s => s.type === 'traditional');
+
+        const dvpSettled = dvp.filter(s => s.status === 'settled');
+        document.getElementById('dvpCount').textContent = dvpSettled.length;
+        if (dvpSettled.length > 0) {
+            const avg = dvpSettled.reduce((sum, s) => sum + s.latencyMs, 0) / dvpSettled.length;
+            document.getElementById('dvpLatency').textContent = avg.toFixed(0) + 'ms';
+        }
+        document.getElementById('dvpSuccess').textContent = '100%';
+
+        const tradResolved = trad.filter(s => s.status !== 'pending');
+        const tradSettled = trad.filter(s => s.status === 'settled' && s.latencyMs != null);
+        const tradFailed = trad.filter(s => s.status === 'failed');
+        document.getElementById('tradCount').textContent = tradResolved.length;
+        if (tradSettled.length > 0) {
+            const avg = tradSettled.reduce((sum, s) => sum + s.latencyMs, 0) / tradSettled.length;
+            document.getElementById('tradLatency').textContent = (avg / 1000).toFixed(1) + 's';
+        } else {
+            document.getElementById('tradLatency').textContent = tradResolved.length === 0 ? '0ms' : 'pending';
+        }
+        if (tradResolved.length > 0) {
+            const rate = ((tradResolved.length - tradFailed.length) / tradResolved.length * 100);
+            document.getElementById('tradSuccess').textContent = rate.toFixed(0) + '%';
+        } else {
+            document.getElementById('tradSuccess').textContent = '100%';
+        }
+    }
+
+    function updateComparison() {
+        const dvpSettled = settlements.filter(s => s.type === 'dvp' && s.status === 'settled');
+        if (dvpSettled.length > 0) {
+            const avg = dvpSettled.reduce((sum, s) => sum + s.latencyMs, 0) / dvpSettled.length;
+            document.getElementById('onchainTime').textContent = avg.toFixed(0) + 'ms';
+        }
+        const tradSettled = settlements.filter(s => s.type === 'traditional' && s.status === 'settled' && s.latencyMs != null);
+        if (tradSettled.length > 0) {
+            const avg = tradSettled.reduce((sum, s) => sum + s.latencyMs, 0) / tradSettled.length;
+            document.getElementById('tradTime').textContent = (avg / 1000).toFixed(1) + 's';
+        }
+    }
+
+    function renderSettlements() {
+        const container = document.getElementById('settlementsList');
+        // Newest first — take last 60 to avoid DOM bloat
+        const visible = settlements.slice(-60).reverse();
+        container.innerHTML = '';
+
+        visible.forEach(s => {
+            const isDvp = s.type === 'dvp';
+            const isPending = s.status === 'pending';
+            const isFailed = s.status === 'failed';
+            const failKey = s.type + '_' + s.orderId;
+            const justFailed = isFailed && !renderedFailIds.has(failKey);
+
+            const item = document.createElement('div');
+            let cls = 'settlement-item';
+            if (!isDvp) cls += ' type-traditional';
+            if (isPending) cls += ' status-pending';
+            if (isFailed) cls += ' status-failed';
+            if (justFailed) cls += ' just-failed';
+            item.className = cls;
+
+            let badgeHtml;
+            if (isPending) badgeHtml = '<span class="type-badge pending">Pending\u2026</span>';
+            else if (isDvp) badgeHtml = '<span class="type-badge dvp">DvP</span>';
+            else badgeHtml = '<span class="type-badge traditional">Traditional</span>';
+
+            let latencyStr = '-';
+            if (s.latencyMs != null) {
+                latencyStr = s.latencyMs >= 1000 ? (s.latencyMs / 1000).toFixed(1) + 's' : s.latencyMs.toFixed(0) + 'ms';
+            } else if (isPending) {
+                latencyStr = '\u2026';
+            }
+
+            let statusHtml;
+            if (isPending) statusHtml = '<span class="status-badge pending">Pending</span>';
+            else if (isFailed) statusHtml = '<span class="status-badge failed">Failed</span>';
+            else statusHtml = '<span class="status-badge settled">Settled</span>';
+
+            const cash = s.cashAmount != null ? '$' + Number(s.cashAmount).toLocaleString() : '-';
+            const sec = s.securitiesAmount != null ? s.securitiesAmount + ' shares' : '-';
+            const priceTag = s.assetPrice ? '@ $' + s.assetPrice.toFixed(2) : '';
+
+            item.innerHTML = `
+                <div class="settlement-id">#${s.orderId}</div>
+                <div>${badgeHtml}</div>
+                <div class="settlement-details">
+                    <div class="settlement-detail">Cash: <span>${cash}</span></div>
+                    <div class="settlement-detail">Securities: <span>${sec}</span></div>
+                    ${priceTag ? '<div class="settlement-detail"><span>' + priceTag + '</span></div>' : ''}
+                </div>
+                <div class="settlement-latency">${latencyStr}</div>
+                <div class="settlement-status">${statusHtml}</div>
+            `;
+            container.appendChild(item);
+
+            if (isFailed && s.traditionalFailReason) {
+                const reason = document.createElement('div');
+                reason.className = 'fail-reason';
+                reason.textContent = "This trade\u2019s traditional settlement failed \u2014 " +
+                    s.traditionalFailReason + ". With blockchain DvP, this cannot happen.";
+                container.appendChild(reason);
+            }
+
+            if (justFailed) renderedFailIds.add(failKey);
+        });
+    }
+
+    // Also refresh pending items periodically (their latency ticks up)
+    setInterval(refreshUI, 1000);
+
+    // =================================================================
+    // SLIDER LABELS
+    // =================================================================
+    document.getElementById('sliderLatency').addEventListener('input', function() {
+        document.getElementById('valLatency').textContent = parseFloat(this.value).toFixed(1) + 's';
+    });
+    document.getElementById('sliderSuccess').addEventListener('input', function() {
+        document.getElementById('valSuccess').textContent = this.value + '%';
+    });
+
+    // =================================================================
+    // PAUSE / RESUME
+    // =================================================================
+    document.getElementById('btnPause').addEventListener('click', function() {
+        simRunning = !simRunning;
+        this.textContent = simRunning ? 'Pause' : 'Resume';
+        this.classList.toggle('paused', !simRunning);
+    });
+
+    // =================================================================
+    // RESET
+    // =================================================================
+    document.getElementById('btnReset').addEventListener('click', function() {
+        // Stop current intervals
+        clearInterval(tradeInterval);
+        clearInterval(priceInterval);
+
+        // Clear state
+        settlements = [];
+        pendingTraditional = [];
+        renderedFailIds = new Set();
+        allMarkers = [];
+        priceData = [];
+        dvpBarData = [];
+        tradBarData = [];
+        lastChartTime = 0;
+        nextOrderId = 0;
+        currentPrice = 150;
+        simRunning = true;
+
+        // Reset UI
+        document.getElementById('btnPause').textContent = 'Pause';
+        document.getElementById('btnPause').classList.remove('paused');
+        document.getElementById('dvpCount').textContent = '0';
+        document.getElementById('dvpLatency').textContent = '0ms';
+        document.getElementById('dvpSuccess').textContent = '100%';
+        document.getElementById('tradCount').textContent = '0';
+        document.getElementById('tradLatency').textContent = '0ms';
+        document.getElementById('tradSuccess').textContent = '100%';
+        document.getElementById('onchainTime').textContent = '<1s';
+        document.getElementById('tradTime').textContent = 'T+1';
+        document.getElementById('settlementsList').innerHTML = '';
+
+        // Rebuild chart
+        initChart();
+
+        // Restart
+        priceInterval = setInterval(priceTick, 500);
+        priceTick();
+        tradeInterval = setInterval(generateTrade, 7500);
+        setTimeout(generateTrade, 1000);
+    });
+    </script>
+</body>
+</html>
