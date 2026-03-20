@@ -12,7 +12,7 @@ The dashboard runs entirely in the browser with a self-contained simulation engi
 - Live stats grid comparing both settlement methods
 - Settlement feed with pending/settled/failed states
 
-![Dashboard Preview](https://img.shields.io/badge/status-demo-blue)
+![Dashboard Demo](demo.gif)
 
 ## Quick Start
 
